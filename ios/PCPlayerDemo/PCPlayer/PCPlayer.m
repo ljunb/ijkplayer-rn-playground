@@ -142,11 +142,12 @@
   if (self.playerVC.playbackState == IJKMPMoviePlaybackStatePlaying) {
     [self setupTimer];
   } else {
+    // 清除timer
+    [self clearTimer];
+    
     if (self.playerVC.playbackState == IJKMPMoviePlaybackStateStopped && self.onPlayComplete) {
       self.onPlayComplete(nil);
     }
-    // 清除timer
-    [self clearTimer];
   }
 }
 
