@@ -24,6 +24,7 @@
   NSInteger _height;
   BOOL _pause;
   BOOL _fullscreen;
+  NSTimer *_timer;
 }
 
 - (void)dealloc {
@@ -45,6 +46,11 @@
                                            selector:@selector(statusBarOrientationChange:)
                                                name:UIApplicationDidChangeStatusBarOrientationNotification
                                              object:nil];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(playerPlaybackStateDidChange:)
+                                               name:IJKMPMoviePlayerPlaybackStateDidChangeNotification
+                                             object:nil];
+  
 }
 
 - (void)setUrl:(NSString *)url {
@@ -69,7 +75,6 @@
     
     IJKFFMoviePlayerController *player = [[IJKFFMoviePlayerController alloc] initWithContentURLString:_url withOptions:options];
     [player setScalingMode:IJKMPMovieScalingModeFill];
-    [player prepareToPlay];
     [self addSubview:player.view];
     _playerVC = player;
   }
@@ -101,7 +106,7 @@
   if (self.playerVC.isPlaying) {
     [self.playerVC pause];
   } else {
-    [self.playerVC play];
+    [self play];
   }
 }
 
@@ -111,26 +116,43 @@
   } else {
     self.playerVC.currentPlaybackTime = seek * self.playerVC.duration;
   }
+  if (!self.playerVC.isPlaying) {
+    [self play];
+  }
+  
   NSLog(@"Seek to: %f, duration: %f", self.playerVC.currentPlaybackTime, self.playerVC.duration);
 }
 
 - (void)setFullscreen:(BOOL)fullscreen {
-  if (fullscreen) {//小屏->全屏
-    [UIView animateWithDuration:0.25 animations:^{
-      NSNumber * value  = [NSNumber numberWithInt:UIInterfaceOrientationLandscapeRight];
-      [[UIDevice currentDevice] setValue:value forKey:@"orientation"];
-    }];
-  }else{//全屏->小屏
-    [UIView animateWithDuration:0.25 animations:^{
-      NSNumber * value  = [NSNumber numberWithInt:UIInterfaceOrientationPortrait];
-      [[UIDevice currentDevice] setValue:value forKey:@"orientation"];
-    }];
+  UIInterfaceOrientation orientation = fullscreen ? UIInterfaceOrientationLandscapeRight : UIInterfaceOrientationPortrait;
+  [UIView animateWithDuration:0.25 animations:^{
+    [[UIDevice currentDevice] setValue:[NSNumber numberWithInt:orientation] forKey:@"orientation"];
+  }];
+}
+
+- (void)play {
+  if (!self.playerVC.isPreparedToPlay) {
+    [self.playerVC prepareToPlay];
   }
+  [self.playerVC play];
 }
 
 #pragma mark - Notification
+- (void)playerPlaybackStateDidChange:(NSNotification *)notification {
+  if (self.playerVC.playbackState == IJKMPMoviePlaybackStatePlaying) {
+    [self setupTimer];
+  } else {
+    if (self.playerVC.playbackState == IJKMPMoviePlaybackStateStopped && self.onPlayComplete) {
+      self.onPlayComplete(nil);
+    }
+    // 清除timer
+    [self clearTimer];
+  }
+}
+
 - (void)statusBarOrientationChange:(NSNotification *)notification {
   UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
+  // 全屏
   if (orientation == UIInterfaceOrientationLandscapeRight || orientation == UIInterfaceOrientationLandscapeLeft) {
     _fullscreen = YES;
     [UIView animateWithDuration:0.25 animations:^{
@@ -138,6 +160,7 @@
       self.playerVC.view.frame = CGRectMake(0, 0, SCREEN_W, SCREEN_H);
     }];
   }
+  // 复原
   if (orientation == UIInterfaceOrientationPortrait) {
     _fullscreen = NO;
     [UIView animateWithDuration:0.25 animations:^{
@@ -153,6 +176,22 @@
                            };
     self.onOrientationChange(body);
   }
+}
+
+#pragma mark - Timer
+- (void)setupTimer {
+  _timer = [NSTimer scheduledTimerWithTimeInterval:1 repeats:YES block:^(NSTimer * _Nonnull timer) {
+    CGFloat value = self.playerVC.currentPlaybackTime / self.playerVC.playableDuration;
+    if (self.onChange) {
+      self.onChange(@{@"value": @(value)});
+    }
+    NSLog(@"Timer is keep running...");
+  }];
+}
+
+- (void)clearTimer {
+  [_timer invalidate];
+  _timer = nil;
 }
 
 @end

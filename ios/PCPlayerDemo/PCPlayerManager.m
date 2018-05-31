@@ -26,5 +26,7 @@ RCT_EXPORT_VIEW_PROPERTY(pause, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(fullscreen, BOOL)
 // event
 RCT_EXPORT_VIEW_PROPERTY(onOrientationChange, RCTDirectEventBlock)
+RCT_EXPORT_VIEW_PROPERTY(onChange, RCTBubblingEventBlock)
+RCT_EXPORT_VIEW_PROPERTY(onPlayComplete, RCTDirectEventBlock)
 
 @end
