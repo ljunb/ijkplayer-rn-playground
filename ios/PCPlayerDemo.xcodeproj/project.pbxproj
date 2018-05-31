@@ -35,6 +35,8 @@
 		3426CD5E20BE8AE5003AC172 /* libbz2.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 3426CD5D20BE8AE4003AC172 /* libbz2.tbd */; };
 		3426CD6020BE8AEA003AC172 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 3426CD5F20BE8AEA003AC172 /* libz.tbd */; };
 		3426CD7120BE908B003AC172 /* IJKMediaFramework.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3426CD7020BE908B003AC172 /* IJKMediaFramework.framework */; };
+		3495BC4C20C0068600DA3685 /* PCPlayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 3495BC4920C004BD00DA3685 /* PCPlayer.m */; };
+		3495BC4D20C0068900DA3685 /* PCPlayerManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 3495BC4B20C004BD00DA3685 /* PCPlayerManager.m */; };
 		5E9157361DD0AC6A00FF2AA8 /* libRCTAnimation.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5E9157331DD0AC6500FF2AA8 /* libRCTAnimation.a */; };
 		832341BD1AAA6AB300B99B32 /* libRCTText.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 832341B51AAA6A8300B99B32 /* libRCTText.a */; };
 		ADBDB9381DFEBF1600ED6528 /* libRCTBlob.a in Frameworks */ = {isa = PBXBuildFile; fileRef = ADBDB9271DFEBF0700ED6528 /* libRCTBlob.a */; };
@@ -1046,7 +1048,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				13B07FBC1A68108700A75B9A /* AppDelegate.m in Sources */,
+				3495BC4C20C0068600DA3685 /* PCPlayer.m in Sources */,
 				13B07FC11A68108700A75B9A /* main.m in Sources */,
+				3495BC4D20C0068900DA3685 /* PCPlayerManager.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
