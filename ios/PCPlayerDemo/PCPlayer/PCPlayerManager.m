@@ -28,6 +28,4 @@ RCT_EXPORT_VIEW_PROPERTY(fullscreen, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(onOrientationChange, RCTDirectEventBlock)
 RCT_EXPORT_VIEW_PROPERTY(onChange, RCTBubblingEventBlock)
 RCT_EXPORT_VIEW_PROPERTY(onPlayComplete, RCTDirectEventBlock)
-NSMutableDictionary *a = [NSMutableDictionary dictionary];
-[a setObject:@"" forKey:@""];
 @end

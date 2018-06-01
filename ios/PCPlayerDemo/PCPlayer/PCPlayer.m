@@ -50,7 +50,6 @@
                                            selector:@selector(playerPlaybackStateDidChange:)
                                                name:IJKMPMoviePlayerPlaybackStateDidChangeNotification
                                              object:nil];
-  
 }
 
 - (void)setUrl:(NSString *)url {
@@ -75,6 +74,7 @@
     
     IJKFFMoviePlayerController *player = [[IJKFFMoviePlayerController alloc] initWithContentURLString:_url withOptions:options];
     [player setScalingMode:IJKMPMovieScalingModeFill];
+    [player prepareToPlay];
     [self addSubview:player.view];
     _playerVC = player;
   }
@@ -181,13 +181,19 @@
 
 #pragma mark - Timer
 - (void)setupTimer {
-  _timer = [NSTimer scheduledTimerWithTimeInterval:1 repeats:YES block:^(NSTimer * _Nonnull timer) {
-    CGFloat value = self.playerVC.currentPlaybackTime / self.playerVC.playableDuration;
-    if (self.onChange) {
-      self.onChange(@{@"value": @(value)});
-    }
-    NSLog(@"Timer is keep running...");
-  }];
+  if (!_timer) {
+    __weak __typeof(self) weakSelf = self;
+    _timer = [NSTimer scheduledTimerWithTimeInterval:1 repeats:YES block:^(NSTimer * _Nonnull timer) {
+      CGFloat value = weakSelf.playerVC.currentPlaybackTime / weakSelf.playerVC.duration;
+      if (weakSelf.onChange) {
+        weakSelf.onChange(@{@"value": @(value), @"currentTime": @(weakSelf.playerVC.currentPlaybackTime), @"totalTime": @(weakSelf.playerVC.duration), @"playableDuration": @(self.playerVC.playableDuration)});
+      }
+      NSLog(@"Timer is keep running...");
+    }];
+  } else {
+    [self clearTimer];
+    [self setupTimer];
+  }
 }
 
 - (void)clearTimer {

@@ -11,12 +11,12 @@ import {
   requireNativeComponent,
   StyleSheet,
   View,
-  Slider,
   NativeModules,
   Text,
   TouchableOpacity,
   Animated
 } from 'react-native';
+import PlayerSlider from "./PlayerSlider";
 
 const MPCPlayerKit = NativeModules.PCPlayerKit;
 const MPCPlayer = requireNativeComponent('PCPlayer', PCPlayerView);
@@ -84,6 +84,22 @@ const styles = StyleSheet.create({
   title: {
     color: '#999',
     fontSize: 15
+  },
+  timeWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 10,
+    justifyContent: 'space-between'
+  },
+  timeLabel: {
+    color: '#999',
+    fontSize: 12,
+    width: 36,
+    textAlign: 'center'
+  },
+  timeLine: {
+    color: '#999',
+    fontSize: 12
   }
 });
 
@@ -93,7 +109,9 @@ export default class PCPlayerView extends Component {
     this.screenW = new Animated.Value(props.style.width);
     this.screenH = new Animated.Value(props.style.height);
     this.state = {
-      isPause: true
+      isPause: true,
+      currentTime: 0,
+      totalTime: 0
     };
     this.isShowBottomBar = false;
     this.animationValue = new Animated.Value(0);
@@ -127,6 +145,7 @@ export default class PCPlayerView extends Component {
    */
   handleValueChange = value => {
     this.handleSeek(value);
+    console.log(`Seek time complete: ${value}`);
   };
 
   /**
@@ -160,7 +179,13 @@ export default class PCPlayerView extends Component {
    * @param evt
    */
   handleChange = evt => {
-    this.slider && this.slider.setNativeProps({value: evt.nativeEvent.value});
+    const { value, currentTime, totalTime, playableDuration } = evt.nativeEvent;
+    console.log(`From native value: ${ value}`);
+    // this.slider && this.slider.setNativeProps({ value });
+
+    this.slider && this.slider.updateCircle(value);
+    this.slider && this.slider.updateProgress(playableDuration / totalTime);
+    this.setState({ currentTime: currentTime + 1, totalTime });
   };
 
   /**
@@ -221,11 +246,7 @@ export default class PCPlayerView extends Component {
             <Text>→</Text>
           </TouchableOpacity>
         </View>
-        <Slider
-          ref={r => this.slider = r}
-          style={styles.slider}
-          onValueChange={this.handleValueChange}
-        />
+        <PlayerSlider ref={r => this.slider = r} style={{flex: 1, marginHorizontal: 12}}/>
         <TouchableOpacity onPress={this.handleFullScreen} style={styles.fullScreenBtn}>
         </TouchableOpacity>
       </Animated.View>
@@ -245,6 +266,31 @@ export default class PCPlayerView extends Component {
         <Text style={styles.title}>测试标题</Text>
       </Animated.View>
     )
+  };
+
+  renderTimeBottomBar = () => {
+    const { currentTime, totalTime} = this.state;
+    const translateY = this.animationValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: [40, 0]
+    });
+    return (
+      <Animated.View style={[styles.bottomBar, {transform: [{translateY}]}]}>
+        <View style={styles.timeWrapper}>
+          <Text style={styles.timeLabel}>{this.formatTimeStr(currentTime)}</Text>
+          <Text style={styles.timeLine}>/</Text>
+          <Text style={styles.timeLabel}>{this.formatTimeStr(totalTime)}</Text>
+        </View>
+        <PlayerSlider ref={r => this.slider = r} style={{flex: 1, marginHorizontal: 12}}/>
+        <TouchableOpacity onPress={this.handleFullScreen} style={styles.fullScreenBtn} />
+      </Animated.View>
+    );
+  };
+
+  formatTimeStr = time => {
+    const minutes = parseInt(time / 60);
+    const seconds = parseInt(time % 60);
+    return `${minutes < 10 ? 0 : ''}${minutes}:${seconds < 10 ? 0 : ''}${seconds}`
   };
 
   render() {
@@ -270,6 +316,7 @@ export default class PCPlayerView extends Component {
         </TouchableOpacity>
         {this.renderTopBar()}
         {this.renderBottomBar()}
+        {/*{this.renderTimeBottomBar()}*/}
       </Animated.View>
     )
   }
