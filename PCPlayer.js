@@ -5,24 +5,18 @@
  * Date   : 2018/5/30
  * Time   : 15:27
  */
-import React, { Component, PureComponent } from 'react';
+import React, { Component } from 'react';
 import {
-  Dimensions,
   requireNativeComponent,
   StyleSheet,
   View,
-  NativeModules,
   Text,
   TouchableOpacity,
   Animated
 } from 'react-native';
 import PlayerSlider from "./PlayerSlider";
 
-const MPCPlayerKit = NativeModules.PCPlayerKit;
 const MPCPlayer = requireNativeComponent('PCPlayer', PCPlayerView);
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const SCREEN_HEIGHT = Dimensions.get('window').height;
-
 const styles = StyleSheet.create({
   bottomBar: {
     position: 'absolute',
@@ -124,7 +118,6 @@ export default class PCPlayerView extends Component {
   handleOrientationChange = evt => {
     const { window, fullscreen } = evt.nativeEvent;
     this.isFullscreen = fullscreen;
-    console.log(`FullScreen: ${fullscreen} Window: w - ${window.width}; h - ${window.height}`);
 
     // RN 界面的动画
     Animated.parallel([
@@ -136,25 +129,17 @@ export default class PCPlayerView extends Component {
         toValue: window.height,
         duration: 200
       })
-    ]).start()
-  };
-
-  /**
-   * 滑动 slider，更新播放进度
-   * @param value
-   */
-  handleValueChange = value => {
-    this.handleSeek(value);
-    console.log(`Seek time complete: ${value}`);
+    ]).start();
   };
 
   /**
    * 点击 快进/快退（15s）
    * @param time
    */
-  handleSeek = time => {
+  handleSeekStep = time => {
     this.delayDismiss();
-    this.player.setNativeProps({seek: time});
+    this.player && this.player.setNativeProps({seek: time});
+    this.slider && this.slider.updateIndicator((this.state.currentTime + time) / this.state.totalTime);
   };
 
   /**
@@ -180,11 +165,9 @@ export default class PCPlayerView extends Component {
    */
   handleChange = evt => {
     const { value, currentTime, totalTime, playableDuration } = evt.nativeEvent;
-    console.log(`From native value: ${ value}`);
-    // this.slider && this.slider.setNativeProps({ value });
 
-    this.slider && this.slider.updateCircle(value);
-    this.slider && this.slider.updateProgress(playableDuration / totalTime);
+    this.slider && this.slider.updateIndicator(value);
+    this.slider && this.slider.updateBuffer(playableDuration / totalTime);
     this.setState({ currentTime: currentTime + 1, totalTime });
   };
 
@@ -225,6 +208,31 @@ export default class PCPlayerView extends Component {
     }
   };
 
+  /**
+   * 拖动slider
+   */
+  handleSeekingTime = ({value}) => {
+    console.log(`Progress: ${value}`);
+  };
+
+  /**
+   * slider开始获得事件
+   */
+  handleSeekTimeBegin = () => {
+    // 清除工具条消失的计时器
+    this.clearDismissTimer();
+    // 暂停播放器，销毁原生的计时器
+    this.player && this.player.setNativeProps({pause: true});
+  };
+
+  /**
+   * slider点击、滑动结束
+   */
+  handleSeekTimeEnd = ({value}) => {
+    this.delayDismiss();
+    this.player && this.player.setNativeProps({seek: value});
+  };
+
   renderBottomBar = () => {
     const { isPause } = this.state;
     const pauseText = isPause ? 'PL' : 'PA';
@@ -236,17 +244,23 @@ export default class PCPlayerView extends Component {
     return (
       <Animated.View style={[styles.bottomBar, {transform: [{translateY}]}]}>
         <View style={styles.seekBtnWrapper}>
-          <TouchableOpacity onPress={() => this.handleSeek(-15)} style={styles.seekBtn}>
+          <TouchableOpacity onPress={() => this.handleSeekStep(-15)} style={styles.seekBtn}>
             <Text>←</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={this.handlePause} style={styles.seekBtn}>
             <Text>{pauseText}</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => this.handleSeek(15)} style={styles.seekBtn}>
+          <TouchableOpacity onPress={() => this.handleSeekStep(15)} style={styles.seekBtn}>
             <Text>→</Text>
           </TouchableOpacity>
         </View>
-        <PlayerSlider ref={r => this.slider = r} style={{flex: 1, marginHorizontal: 12}}/>
+        <PlayerSlider
+          ref={r => this.slider = r}
+          style={{flex: 1, marginHorizontal: 12}}
+          onSeekTimeBegin={this.handleSeekTimeBegin}
+          onSeekingTime={this.handleSeekingTime}
+          onSeekTimeEnd={this.handleSeekTimeEnd}
+        />
         <TouchableOpacity onPress={this.handleFullScreen} style={styles.fullScreenBtn}>
         </TouchableOpacity>
       </Animated.View>

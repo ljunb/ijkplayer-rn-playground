@@ -111,8 +111,9 @@
 }
 
 - (void)setSeek:(float)seek {
+  // 按15s快进/快退
   if (ABS(seek) == 15) {
-    self.playerVC.currentPlaybackTime = self.playerVC.currentPlaybackTime + seek;
+    self.playerVC.currentPlaybackTime += seek;
   } else {
     self.playerVC.currentPlaybackTime = seek * self.playerVC.duration;
   }
@@ -154,7 +155,8 @@
 - (void)statusBarOrientationChange:(NSNotification *)notification {
   UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
   // 全屏
-  if (orientation == UIInterfaceOrientationLandscapeRight || orientation == UIInterfaceOrientationLandscapeLeft) {
+  if (orientation == UIInterfaceOrientationLandscapeRight
+      || orientation == UIInterfaceOrientationLandscapeLeft) {
     _fullscreen = YES;
     [UIView animateWithDuration:0.25 animations:^{
       self.frame = CGRectMake(0, 0, SCREEN_W, SCREEN_H);
@@ -172,9 +174,12 @@
   
   if (self.onOrientationChange) {
     NSDictionary *body = @{
-                           @"window": @{ @"width": @(_fullscreen ? SCREEN_W : _width), @"height": @(_fullscreen ? SCREEN_H : _height)},
+                           @"window": @{
+                             @"width": @(_fullscreen ? SCREEN_W : _width),
+                             @"height": @(_fullscreen ? SCREEN_H : _height)
+                           },
                            @"fullscreen": @(_fullscreen)
-                           };
+                         };
     self.onOrientationChange(body);
   }
 }
@@ -182,11 +187,17 @@
 #pragma mark - Timer
 - (void)setupTimer {
   if (!_timer) {
-    __weak __typeof(self) weakSelf = self;
+    __weak typeof(self) weakSelf = self;
     _timer = [NSTimer scheduledTimerWithTimeInterval:1 repeats:YES block:^(NSTimer * _Nonnull timer) {
       CGFloat value = weakSelf.playerVC.currentPlaybackTime / weakSelf.playerVC.duration;
       if (weakSelf.onChange) {
-        weakSelf.onChange(@{@"value": @(value), @"currentTime": @(weakSelf.playerVC.currentPlaybackTime), @"totalTime": @(weakSelf.playerVC.duration), @"playableDuration": @(self.playerVC.playableDuration)});
+        NSDictionary *body = @{
+                               @"value": @(value),
+                               @"currentTime": @(weakSelf.playerVC.currentPlaybackTime),
+                               @"totalTime": @(weakSelf.playerVC.duration),
+                               @"playableDuration": @(weakSelf.playerVC.playableDuration)
+                               };
+        weakSelf.onChange(body);
       }
       NSLog(@"Timer is keep running...");
     }];

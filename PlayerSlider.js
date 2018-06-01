@@ -11,112 +11,127 @@ import {
   StyleSheet,
   PanResponder
 } from 'react-native';
+import PropTypes from 'prop-types';
 
 const styles = StyleSheet.create({
   slider: {
-    height: 20,
-    // backgroundColor: 'black'
+    height: 20
   },
   bgLine: {
     height: 2,
-    backgroundColor: '#ccc',
+    backgroundColor: '#aaa',
     position: 'absolute',
     left: 0,
     right: 0,
     top: (20 - 2) / 2
   },
-  progress: {
-    backgroundColor: 'red',
+  buffer: {
+    backgroundColor: '#fff',
     position: 'absolute',
     left: 0,
     top: 0,
     bottom: 0
   },
-  circle: {
-    backgroundColor: '#fff',
+  indicatorBorder: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
     position: 'absolute',
     left: 0,
-    height: 10,
-    width: 10,
-    borderRadius: 5,
-    top: 5
+    height: 12,
+    width: 12,
+    borderRadius: 6,
+    top: 4,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  indicator: {
+    backgroundColor: '#fff',
+    height: 8,
+    width: 8,
+    borderRadius: 4
   }
 });
 
 export default class PlayerSlider extends PureComponent {
+  static propTypes = {
+    onSeekTimeBegin: PropTypes.func,
+    onSeekingTime: PropTypes.func,
+    onSeekTimeEnd: PropTypes.func,
+  };
+
   constructor(props) {
     super(props);
     this.panResponder = PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponderCapture: () => false,
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: this.handleResponderGrant,
       onPanResponderMove: this.handlePanResponderMove,
+      onPanResponderRelease: this.handlePanResponderRelease,
     });
-    this.sliderWidth = 0;
-    this.currentProgress = 0;
-    this.currentTime = 0;
+    this.sliderWidth = 0; // 布局完成后滑条宽度
+    this.bufferValue = 0; // 缓冲进度比例，0~1
+    this.indicatorValue = 0; // 当前滑条的变化值，影响圆圈指示器位置，0~1
   }
 
   /**
    * 更新圆圈位置
-   * @param value 0-1
+   * @param value 0~1
    */
-  updateCircle = value => {
-    this.currentTime = value;
-    this.circle && this.circle.setNativeProps({left: this.sliderWidth * value});
+  updateIndicator = value => {
+    this.indicatorValue = value;
+    this.indicator && this.indicator.setNativeProps({left: this.sliderWidth * value});
   };
 
   /**
    * 更新缓冲进度
-   * @param progress 0-1
+   * @param value 0-1
    */
-  updateProgress = progress => {
-    const offsetX = (this.sliderWidth * progress);
-    this.currentProgress = progress;
-    this.progressLine && this.progressLine.setNativeProps({width: offsetX});
+  updateBuffer = value => {
+    this.bufferValue = value;
+    this.bufferLine && this.bufferLine.setNativeProps({width: this.sliderWidth * value});
   };
 
   handleResponderGrant = (evt, ges) => {
     const { locationX } = evt.nativeEvent;
-    console.log(`Grant: ${locationX}`);
 
-    const progressWidth = this.sliderWidth * this.currentProgress / 100;
-    const offsetX = progressWidth < locationX ? progressWidth : locationX;
-    this.circle && this.circle.setNativeProps({left: offsetX});
+    const bufferWidth = this.sliderWidth * this.bufferValue;
+    const offsetX = bufferWidth < locationX ? bufferWidth : locationX;
+    this.indicator && this.indicator.setNativeProps({left: offsetX});
+
+    // 当前时间
+    this.indicatorValue = offsetX / this.sliderWidth;
+    this.props.onSeekTimeBegin && this.props.onSeekTimeBegin({value: this.indicatorValue});
   };
 
   handlePanResponderMove = (evt, ges) => {
-    // 往右滑，快进
-    let newOffsetX = 0;
-    // if (newOffsetX < 0) {
-    //   newOffsetX = 0;
-    // } else if (newOffsetX > this.currentProgress) {
-    //   newOffsetX = this.currentProgress;
-    // }
-    if (ges.vx > 0) {
-      newOffsetX = this.currentTime + ges.dx;
-    } else {
-      newOffsetX = this.currentTime - ges.dx;
+    let indicatorValue = evt.nativeEvent.locationX / this.sliderWidth;
+    if (indicatorValue < 0) {
+      indicatorValue = 0;
+    } else if (indicatorValue > this.bufferValue) {
+      indicatorValue = this.bufferValue;
+    } else if (indicatorValue > 1) {
+      indicatorValue = 1;
     }
-    if (newOffsetX < 0) {
-      newOffsetX = 0;
-    } else if (newOffsetX > this.currentProgress) {
-      newOffsetX = this.currentProgress;
-    }
-    this.currentTime = newOffsetX;
-    this.circle && this.circle.setNativeProps({left: newOffsetX});
-
-    console.log(`Move: dx(${ges.dx}), vx(${ges.vx}), moveX(${ges.moveX})`);
+    // 更新圆圈指示器位置
+    this.updateIndicator(indicatorValue);
+    this.props.onSeekingTime && this.props.onSeekingTime({value: indicatorValue});
   };
 
+  /**
+   * 滑条滑动结束
+   */
+  handlePanResponderRelease = () => {
+    this.props.onSeekTimeEnd && this.props.onSeekTimeEnd({value: this.indicatorValue});
+  };
+
+  /**
+   * 布局回调，更新整体UI
+   */
   handleLayout = evt => {
     const {width} = evt.nativeEvent.layout;
     if (width !== this.sliderWidth) {
       this.sliderWidth = width;
-      this.updateProgress(this.currentProgress);
-      this.updateCircle(this.currentTime);
+      this.updateBuffer(this.bufferValue);
+      this.updateIndicator(this.indicatorValue);
     }
   };
 
@@ -128,9 +143,11 @@ export default class PlayerSlider extends PureComponent {
         {...this.panResponder.panHandlers}
       >
         <View style={styles.bgLine}>
-          <View ref={r => this.progressLine = r} style={styles.progress}/>
+          <View ref={r => this.bufferLine = r} style={styles.buffer}/>
         </View>
-        <View ref={r => this.circle = r} style={styles.circle}/>
+        <View ref={r => this.indicator = r} style={styles.indicatorBorder}>
+          <View style={styles.indicator}/>
+        </View>
       </View>
     )
   }
