@@ -8,7 +8,6 @@
 
 #import "PCPlayer.h"
 #import <IJKMediaFramework/IJKMediaFramework.h>
-#import "UIView+FindUIViewController.h"
 
 #define SCREEN_W [UIScreen mainScreen].bounds.size.width
 #define SCREEN_H [UIScreen mainScreen].bounds.size.height
@@ -25,12 +24,12 @@
   BOOL _pause;
   BOOL _fullscreen;
   NSTimer *_timer;
+  MPVolumeView *_volumeView;
 }
 
 - (void)dealloc {
-  [_playerVC pause];
-  [_playerVC stop];
   [_playerVC shutdown];
+  _playerVC = nil;
   [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
@@ -50,14 +49,17 @@
                                            selector:@selector(playerPlaybackStateDidChange:)
                                                name:IJKMPMoviePlayerPlaybackStateDidChangeNotification
                                              object:nil];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(loadStateDidChange:)
+                                               name:IJKMPMoviePlayerLoadStateDidChangeNotification
+                                             object:nil];
 }
 
 - (void)setUrl:(NSString *)url {
   if ([_url isEqualToString:url]) return;
   
-  [_playerVC pause];
-  [_playerVC stop];
   [_playerVC shutdown];
+  _playerVC = nil;
   
   _url = url;
   [self setupPlayer];
@@ -74,7 +76,7 @@
     
     IJKFFMoviePlayerController *player = [[IJKFFMoviePlayerController alloc] initWithContentURLString:_url withOptions:options];
     [player setScalingMode:IJKMPMovieScalingModeFill];
-    [player prepareToPlay];
+    player.view.frame = self.bounds;
     [self addSubview:player.view];
     _playerVC = player;
   }
@@ -82,7 +84,7 @@
 
 - (void)setWidth:(NSInteger)width {
   _width = width;
-  if (self.bounds.size.width != width) {
+  if (self.frame.size.width != width) {
     CGRect frame = self.frame;
     frame.size.width = width;
     self.frame = frame;
@@ -92,7 +94,7 @@
 
 - (void)setHeight:(NSInteger)height {
   _height = height;
-  if (self.bounds.size.height != height) {
+  if (self.frame.size.height != height) {
     CGRect frame = self.frame;
     frame.size.height = height;
     self.frame = frame;
@@ -131,6 +133,30 @@
   }];
 }
 
+- (void)setVolume:(float)volume {
+  if (_volumeView) {
+    [_volumeView removeFromSuperview];
+    _volumeView = nil;
+  }
+  
+  if (!_volumeView) {
+    _volumeView = [[MPVolumeView alloc] init];
+    _volumeView.hidden = NO;
+    _volumeView.frame = CGRectMake(-40, -40, 40, 40);
+    [self addSubview:_volumeView];
+  }
+  
+  UISlider *sliderView;
+  for (UIView *view in [_volumeView subviews]) {
+    if ([view.class.description isEqualToString:@"MPVolumeSlider"]) {
+      sliderView = (UISlider *)view;
+      break;
+    }
+  }
+  CGFloat oldVolume = sliderView.value;
+  sliderView.value = oldVolume - volume;
+}
+
 - (void)play {
   if (!self.playerVC.isPreparedToPlay) {
     [self.playerVC prepareToPlay];
@@ -139,6 +165,21 @@
 }
 
 #pragma mark - Notification
+- (void)loadStateDidChange:(NSNotification *)notification {
+  NSString *loadState;
+  if ((self.playerVC.loadState & IJKMPMovieLoadStatePlaythroughOK) != 0
+      || (self.playerVC.loadState & IJKMPMovieLoadStatePlayable) != 0) {
+    loadState = @"playable";
+  } else {
+    // 其他两种列入不可播放
+    loadState = @"unplayable";
+  }
+  
+  if (self.onLoadStateDidChange) {
+    self.onLoadStateDidChange(@{@"loadState": loadState});
+  }
+}
+
 - (void)playerPlaybackStateDidChange:(NSNotification *)notification {
   if (self.playerVC.playbackState == IJKMPMoviePlaybackStatePlaying) {
     [self setupTimer];

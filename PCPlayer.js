@@ -12,10 +12,16 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Animated
+  Animated,
+  NetInfo,
+  ImageBackground,
+  PanResponder,
+  NativeModules
 } from 'react-native';
+import PropTypes from 'prop-types';
 import PlayerSlider from "./PlayerSlider";
 
+const PCPlayerManager = NativeModules.PCPlayerManager;
 const MPCPlayer = requireNativeComponent('PCPlayer', PCPlayerView);
 const styles = StyleSheet.create({
   bottomBar: {
@@ -94,23 +100,146 @@ const styles = StyleSheet.create({
   timeLine: {
     color: '#999',
     fontSize: 12
+  },
+  panHandlersView: {
+    position: 'absolute',
+    top: 40,
+    left: 0,
+    bottom: 40,
+    right: 40,
+    backgroundColor: 'transparent'
   }
 });
 
+const PlayState = {
+  'Idle': 0, // 初始状态
+  'Buffering': 1, // 缓冲中
+  'Playing': 2, // 播放中
+  'Pause': 3, // 暂停
+  'Stop': 4, // 播放完毕
+  'NetError': 5 // 网络出错
+};
+
 export default class PCPlayerView extends Component {
+  static propTypes = {
+    coverUrl: PropTypes.string,
+    LoadingComponent: PropTypes.any,
+    NetErrorComponent: PropTypes.any,
+    BottomBarComponent: PropTypes.any,
+    TopBarComponent: PropTypes.any,
+    onSeekStep: PropTypes.func,
+  };
+
   constructor(props) {
     super(props);
-    this.screenW = new Animated.Value(props.style.width);
-    this.screenH = new Animated.Value(props.style.height);
+    this.screenWValue = new Animated.Value(props.style.width);
+    this.screenHValue = new Animated.Value(props.style.height);
+    this.screenWidth = props.style.width;
+    this.screenHeight = props.style.height;
     this.state = {
-      isPause: true,
+      playState: PlayState.Idle,
       currentTime: 0,
-      totalTime: 0
+      totalTime: 0,
     };
     this.isShowBottomBar = false;
     this.animationValue = new Animated.Value(0);
     this.isFullscreen = false;
+    this.netInfoType = null;
+    this.currentValue = 0;
+    this.bufferValue = 0;
+    this.createPanResponder();
   }
+
+  componentDidMount() {
+    NetInfo.removeEventListener('connectionChange', this.handleConnectionChange);
+    NetInfo.addEventListener('connectionChange', this.handleConnectionChange);
+  }
+
+  componentWillUnmount() {
+    NetInfo.removeEventListener('connectionChange', this.handleConnectionChange);
+  }
+
+  createPanResponder = () => {
+    this.panResponder = PanResponder.create({
+      // onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: this.handleResponderGrant,
+      onPanResponderMove: this.handlePanResponderMove,
+      onPanResponderRelease: this.handlePanResponderRelease,
+    });
+  };
+
+  handleResponderGrant = () => {
+    this.handlePressPlayer();
+  };
+
+  handlePanResponderMove = (evt, ges) => {
+    const { locationX } = evt.nativeEvent;
+    const stepAreaBeginX = 0.25 * this.screenWidth;
+
+    if (ges.dx === 0 && ges.dy === 0) return;
+    if (ges.dx !== 0) {
+      // 中间的水平滑动手势，处理快进/快退
+      if (locationX >= stepAreaBeginX && locationX <= this.screenWidth - stepAreaBeginX) {
+        const step = ges.moveX / 66 * (ges.dx > 0 ? 1 : -1);
+        this.currentValue += step / this.state.totalTime;
+        this.currentValue = Math.max(this.currentValue, 0);
+        this.currentValue = Math.min(this.currentValue, this.bufferValue);
+        this.currentValue = Math.min(this.currentValue, 1);
+
+        this.player && this.player.setNativeProps({ seek: this.currentValue });
+        this.slider && this.slider.updateIndicator(this.currentValue);
+      }
+    }
+    if (ges.dy !== 0) {
+      // 左边区域，亮度调节
+      if (locationX <= stepAreaBeginX) {
+        const brightness = ges.moveY / 15000 * (ges.dy> 0 ? 1 : -1);
+        PCPlayerManager.updateBrightness(brightness);
+      } else if (locationX >= this.screenWidth - stepAreaBeginX) {
+        // 右边区域，音量调节
+        const volume = ges.moveY / 2000 * (ges.dy> 0 ? 1 : -1);
+        this.player && this.player.setNativeProps({volume});
+      }
+    }
+  };
+
+  handlePanResponderRelease = () => {
+
+  };
+
+  /**
+   * 监听网络状态变化
+   * @param connectionInfo type
+   * none - device is offline
+   * wifi - device is online and connected via wifi, or is the iOS simulator
+   * cellular - device is connected via Edge, 3G, WiMax, or LTE
+   * unknown - error case and the network status is unknown
+   */
+  handleConnectionChange = connectionInfo => {
+    const { type } = connectionInfo;
+    this.netInfoType = type;
+
+    if (this.state.playState === PlayState.Playing) return;
+    this.setupPlayer();
+    console.log(`Connection info type: ${type}`);
+  };
+
+  /**
+   * 默认是不播放的
+   */
+  setupPlayer = () => {
+    if (this.netInfoType === 'cellular') {
+      console.log(`当前非WiFi，是否继续使用流量播放？`);
+      // todo: 添加提示
+      // this.setState({playState: PlayState.Playing});
+    } else if (this.netInfoType === 'wifi') {
+      this.player && this.player.setNativeProps({pause: false});
+      this.setState({playState: PlayState.Playing});
+    } else {
+      this.setState({playState: PlayState.NetError});
+    }
+  };
 
   /**
    * 屏幕旋转时，更新RN界面
@@ -118,14 +247,16 @@ export default class PCPlayerView extends Component {
   handleOrientationChange = evt => {
     const { window, fullscreen } = evt.nativeEvent;
     this.isFullscreen = fullscreen;
+    this.screenWidth = window.width;
+    this.screenHeight = window.height;
 
     // RN 界面的动画
     Animated.parallel([
-      Animated.timing(this.screenW, {
+      Animated.timing(this.screenWValue, {
         toValue: window.width,
         duration: 200
       }),
-      Animated.timing(this.screenH, {
+      Animated.timing(this.screenHValue, {
         toValue: window.height,
         duration: 200
       })
@@ -146,9 +277,16 @@ export default class PCPlayerView extends Component {
    * 点击 播放/暂停
    */
   handlePause = () => {
+    const { playState } = this.state;
+
     this.delayDismiss();
-    this.player.setNativeProps({pause: !this.state.isPause});
-    this.setState({isPause: !this.state.isPause});
+    if (playState === PlayState.Playing) {
+      this.setState({ playState: PlayState.Pause });
+      this.player.setNativeProps({pause: true});
+    } else if (playState !== PlayState.Buffering) {
+      this.setState({ playState: PlayState.Playing });
+      this.player.setNativeProps({pause: false});
+    }
   };
 
   /**
@@ -169,6 +307,8 @@ export default class PCPlayerView extends Component {
     this.slider && this.slider.updateIndicator(value);
     this.slider && this.slider.updateBuffer(playableDuration / totalTime);
     this.setState({ currentTime: currentTime + 1, totalTime });
+    this.currentValue = currentTime / totalTime;
+    this.bufferValue = playableDuration / totalTime;
   };
 
   /**
@@ -233,9 +373,31 @@ export default class PCPlayerView extends Component {
     this.player && this.player.setNativeProps({seek: value});
   };
 
+  /**
+   * 播放结束
+   */
+  handlePlayComplete = () => {
+    this.setState({playState: PlayState.Stop});
+    this.slider && this.slider.updateIndicator(0);
+  };
+
+  /**
+   * 缓冲状态改变回调
+   */
+  handelLoadStateDidChange = evt => {
+    // loadState === playable/unplayable
+    const { loadState } = evt.nativeEvent;
+    if (loadState === 'playable') {
+      this.setState({playState: PlayState.Playing});
+    } else {
+      this.setState({playState: PlayState.Buffering});
+    }
+    console.log(`Load state: ${loadState}`);
+  };
+
   renderBottomBar = () => {
-    const { isPause } = this.state;
-    const pauseText = isPause ? 'PL' : 'PA';
+    const { playState } = this.state;
+    const pauseText = playState === PlayState.Playing ? '暂停' : '播放';
 
     const translateY = this.animationValue.interpolate({
       inputRange: [0, 1],
@@ -308,31 +470,54 @@ export default class PCPlayerView extends Component {
   };
 
   render() {
-    const { style: {height, width}, ...rest } = this.props;
+    const { style: {height, width}, LoadingComponent, NetErrorComponent, ...rest } = this.props;
+    const { playState } = this.state;
+
+    const isNetError = playState === PlayState.NetError;
+    const isLoading = playState === PlayState.Buffering;
+    const LoadingView = LoadingComponent || <NetLoading coverUrl={this.props.coverUrl} />;
+    const NetErrorView = NetErrorComponent || <NetError />;
 
     return (
       <Animated.View
-        style={{overflow: 'hidden', width: this.screenW, height: this.screenH, backgroundColor: '#ccc'}}
+        style={{overflow: 'hidden', width: this.screenWValue, height: this.screenHValue, backgroundColor: '#ccc'}}
       >
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={this.handlePressPlayer}
-        >
-          <MPCPlayer
-            ref={r => this.player = r}
-            {...rest}
-            height={height}
-            width={width}
-            onOrientationChange={this.handleOrientationChange}
-            onChange={this.handleChange}
-            onPlayComplete={() => this.setState({isPause: true})}
-          />
-        </TouchableOpacity>
+        <MPCPlayer
+          ref={r => this.player = r}
+          {...rest}
+          height={height}
+          width={width}
+          onLoadStateDidChange={this.handelLoadStateDidChange}
+          onOrientationChange={this.handleOrientationChange}
+          onChange={this.handleChange}
+          onPlayComplete={this.handlePlayComplete}
+        />
+        <View style={styles.panHandlersView} {...this.panResponder.panHandlers}/>
         {this.renderTopBar()}
         {this.renderBottomBar()}
-        {/*{this.renderTimeBottomBar()}*/}
+        {isNetError && NetErrorView}
+        {isLoading && LoadingView}
       </Animated.View>
     )
   }
 }
+
+const NetLoading = ({ coverUrl }) => {
+  return (
+    <ImageBackground
+      style={[StyleSheet.absoluteFill, {justifyContent: 'center', alignItems: 'center', backgroundColor: 'transparent'}]}
+      source={{uri: coverUrl}}
+    >
+      <Text style={{color: '#fff'}}>正常加载中...</Text>
+    </ImageBackground>
+  )
+};
+
+const NetError = () => {
+  return (
+    <View style={[StyleSheet.absoluteFill, {justifyContent: 'center', alignItems: 'center'}]}>
+      <Text>网络出错！</Text>
+    </View>
+  )
+};
 

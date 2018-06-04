@@ -8,7 +8,8 @@
 
 #import <React/RCTViewManager.h>
 #import <Foundation/Foundation.h>
+#import <React/RCTBridgeModule.h>
 
-@interface PCPlayerManager : RCTViewManager
+@interface PCPlayerManager : RCTViewManager<RCTBridgeModule>
 
 @end

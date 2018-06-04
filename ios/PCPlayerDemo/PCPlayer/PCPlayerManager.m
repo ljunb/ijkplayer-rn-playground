@@ -8,6 +8,7 @@
 
 #import "PCPlayerManager.h"
 #import "PCPlayer.h"
+#import <MediaPlayer/MediaPlayer.h>
 
 @implementation PCPlayerManager
 
@@ -24,8 +25,16 @@ RCT_EXPORT_VIEW_PROPERTY(height, NSInteger)
 RCT_EXPORT_VIEW_PROPERTY(seek, float)
 RCT_EXPORT_VIEW_PROPERTY(pause, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(fullscreen, BOOL)
+RCT_EXPORT_VIEW_PROPERTY(volume, float)
 // event
 RCT_EXPORT_VIEW_PROPERTY(onOrientationChange, RCTDirectEventBlock)
 RCT_EXPORT_VIEW_PROPERTY(onChange, RCTBubblingEventBlock)
 RCT_EXPORT_VIEW_PROPERTY(onPlayComplete, RCTDirectEventBlock)
+RCT_EXPORT_VIEW_PROPERTY(onLoadStateDidChange, RCTDirectEventBlock)
+
+RCT_EXPORT_METHOD(updateBrightness:(float)brightness) {
+  CGFloat oldBrightness = [UIScreen mainScreen].brightness;
+  [[UIScreen mainScreen] setBrightness:oldBrightness - brightness];
+}
+
 @end
