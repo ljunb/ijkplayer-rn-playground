@@ -22,17 +22,17 @@ RCT_EXPORT_MODULE()
 RCT_EXPORT_VIEW_PROPERTY(url, NSString)
 RCT_EXPORT_VIEW_PROPERTY(width, NSInteger)
 RCT_EXPORT_VIEW_PROPERTY(height, NSInteger)
-RCT_EXPORT_VIEW_PROPERTY(seek, float)
+RCT_EXPORT_VIEW_PROPERTY(seek, CGFloat)
 RCT_EXPORT_VIEW_PROPERTY(pause, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(fullscreen, BOOL)
-RCT_EXPORT_VIEW_PROPERTY(volume, float)
+RCT_EXPORT_VIEW_PROPERTY(volume, CGFloat)
 // event
 RCT_EXPORT_VIEW_PROPERTY(onOrientationChange, RCTDirectEventBlock)
-RCT_EXPORT_VIEW_PROPERTY(onChange, RCTBubblingEventBlock)
+RCT_EXPORT_VIEW_PROPERTY(onPlaying, RCTBubblingEventBlock)
 RCT_EXPORT_VIEW_PROPERTY(onPlayComplete, RCTDirectEventBlock)
 RCT_EXPORT_VIEW_PROPERTY(onLoadStateDidChange, RCTDirectEventBlock)
 
-RCT_EXPORT_METHOD(updateBrightness:(float)brightness) {
+RCT_EXPORT_METHOD(updateBrightness:(CGFloat)brightness) {
   CGFloat oldBrightness = [UIScreen mainScreen].brightness;
   [[UIScreen mainScreen] setBrightness:oldBrightness - brightness];
 }

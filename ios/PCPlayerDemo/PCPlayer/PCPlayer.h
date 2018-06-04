@@ -13,7 +13,7 @@
 
 @property (nonatomic, copy) RCTDirectEventBlock onLoadStateDidChange;
 @property (nonatomic, copy) RCTDirectEventBlock onOrientationChange;
-@property (nonatomic, copy) RCTBubblingEventBlock onChange;
+@property (nonatomic, copy) RCTBubblingEventBlock onPlaying;
 @property (nonatomic, copy) RCTDirectEventBlock onPlayComplete;
 
 @end

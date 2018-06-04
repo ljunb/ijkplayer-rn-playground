@@ -1,9 +1,9 @@
 /**
- * Description : 基于 ijkplayer 集成的播放器组件
+ * Description : 基于ijkplayer封装的跨端点播播放器
  *
  * Author : cookiej
- * Date   : 2018/5/30
- * Time   : 15:27
+ * Date   : 2018/6/4
+ * Time   : 17:11
  */
 import React, { Component } from 'react';
 import {
@@ -16,100 +16,16 @@ import {
   NetInfo,
   ImageBackground,
   PanResponder,
-  NativeModules
+  NativeModules,
+  Dimensions
 } from 'react-native';
 import PropTypes from 'prop-types';
-import PlayerSlider from "./PlayerSlider";
+import PlayerSlider from './PlayerSlider';
+import styles from './Player.style';
 
 const PCPlayerManager = NativeModules.PCPlayerManager;
 const MPCPlayer = requireNativeComponent('PCPlayer', PCPlayerView);
-const styles = StyleSheet.create({
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left:0,
-    right: 0,
-    height: 40,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    flexDirection: 'row',
-    alignItems: 'center'
-  },
-  seekBtnWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: 100,
-    marginLeft: 10
-  },
-  seekBtn: {
-    marginRight: 8,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-    height: 26,
-    width: 26,
-    borderRadius: 13,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  slider: {
-    flex: 1,
-    marginHorizontal: 10
-  },
-  fullScreenBtn: {
-    marginRight: 10,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-    height: 26,
-    width: 26,
-    borderRadius: 13
-  },
-  topBar: {
-    position: 'absolute',
-    top: 0,
-    left:0,
-    right: 0,
-    height: 40,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: 15
-  },
-  backBtn: {
-    marginRight: 8,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-    height: 26,
-    width: 26,
-    borderRadius: 13,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  title: {
-    color: '#999',
-    fontSize: 15
-  },
-  timeWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 10,
-    justifyContent: 'space-between'
-  },
-  timeLabel: {
-    color: '#999',
-    fontSize: 12,
-    width: 36,
-    textAlign: 'center'
-  },
-  timeLine: {
-    color: '#999',
-    fontSize: 12
-  },
-  panHandlersView: {
-    position: 'absolute',
-    top: 40,
-    left: 0,
-    bottom: 40,
-    right: 40,
-    backgroundColor: 'transparent'
-  }
-});
+const SCREEN_WIDTH = Dimensions.get('screen').width;
 
 const PlayState = {
   'Idle': 0, // 初始状态
@@ -122,31 +38,41 @@ const PlayState = {
 
 export default class PCPlayerView extends Component {
   static propTypes = {
-    coverUrl: PropTypes.string,
-    LoadingComponent: PropTypes.any,
+    url: PropTypes.string, // 视频地址
+    coverUrl: PropTypes.string, // 视频初始占位图
+    height: PropTypes.number, // 视频高度
+    width: PropTypes.number, // 视频宽度
+    seekStep: PropTypes.number, // 快进/快退间隔，单位秒
+    LoadingComponent: PropTypes.any, //
     NetErrorComponent: PropTypes.any,
     BottomBarComponent: PropTypes.any,
     TopBarComponent: PropTypes.any,
     onSeekStep: PropTypes.func,
+    onPlaying: PropTypes.func,
+  };
+
+  static defaultProps = {
+    height: 300,
+    width: SCREEN_WIDTH,
+    seekStep: 15
   };
 
   constructor(props) {
     super(props);
-    this.screenWValue = new Animated.Value(props.style.width);
-    this.screenHValue = new Animated.Value(props.style.height);
-    this.screenWidth = props.style.width;
-    this.screenHeight = props.style.height;
     this.state = {
       playState: PlayState.Idle,
       currentTime: 0,
       totalTime: 0,
     };
-    this.isShowBottomBar = false;
-    this.animationValue = new Animated.Value(0);
-    this.isFullscreen = false;
-    this.netInfoType = null;
-    this.currentValue = 0;
-    this.bufferValue = 0;
+    this.screenWValue = new Animated.Value(props.width); // 屏幕翻转时宽度动画值
+    this.screenHValue = new Animated.Value(props.height); // 屏幕翻转时高度动画值
+    this.toolBarAnimationValue = new Animated.Value(0); // 工具条动画值
+    this.currentScreenW = props.width; // 记录屏幕宽度，用于判断手势区域
+    this.isShowToolBar = false; // 是否显示工具条
+    this.isFullscreen = false; // 是否全屏模式
+    this.netInfoType = null; // 网络连接模式
+    this.currentValue = 0; // 当前播放进度值
+    this.bufferValue = 0; // 当前缓冲进度值
     this.createPanResponder();
   }
 
@@ -159,33 +85,46 @@ export default class PCPlayerView extends Component {
     NetInfo.removeEventListener('connectionChange', this.handleConnectionChange);
   }
 
+  /**
+   * 创建手势
+   */
   createPanResponder = () => {
     this.panResponder = PanResponder.create({
-      // onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: this.handleResponderGrant,
       onPanResponderMove: this.handlePanResponderMove,
-      onPanResponderRelease: this.handlePanResponderRelease,
     });
   };
 
+  /**
+   * 触摸时，显示上下工具条
+   */
   handleResponderGrant = () => {
     this.handlePressPlayer();
   };
 
+  /**
+   * 在当前播放器上移动手势时
+   * @param evt locationX - 触摸点相对于父元素的横坐标
+   * @param ges
+   * dx - 从触摸操作开始时的累计横向路程
+   * dy - 从触摸操作开始时的累计纵向路程
+   * moveX - 最近一次移动时的屏幕横坐标
+   * moveY - 最近一次移动时的屏幕纵坐标
+   */
   handlePanResponderMove = (evt, ges) => {
     const { locationX } = evt.nativeEvent;
-    const stepAreaBeginX = 0.25 * this.screenWidth;
+    const seekTimeAreaBeginX = 0.25 * this.currentScreenW;
 
     if (ges.dx === 0 && ges.dy === 0) return;
     if (ges.dx !== 0) {
       // 中间的水平滑动手势，处理快进/快退
-      if (locationX >= stepAreaBeginX && locationX <= this.screenWidth - stepAreaBeginX) {
-        const step = ges.moveX / 66 * (ges.dx > 0 ? 1 : -1);
+      if (locationX >= seekTimeAreaBeginX && locationX <= this.currentScreenW - seekTimeAreaBeginX) {
+        const step = ges.moveX / 100 * (ges.dx > 0 ? 1 : -1);
         this.currentValue += step / this.state.totalTime;
-        this.currentValue = Math.max(this.currentValue, 0);
-        this.currentValue = Math.min(this.currentValue, this.bufferValue);
-        this.currentValue = Math.min(this.currentValue, 1);
+        this.currentValue = Math.max(this.currentValue, 0); // 不小于0
+        this.currentValue = Math.min(this.currentValue, this.bufferValue); // 不超过缓冲进度
+        this.currentValue = Math.min(this.currentValue, 1); // 不大于1
 
         this.player && this.player.setNativeProps({ seek: this.currentValue });
         this.slider && this.slider.updateIndicator(this.currentValue);
@@ -193,19 +132,15 @@ export default class PCPlayerView extends Component {
     }
     if (ges.dy !== 0) {
       // 左边区域，亮度调节
-      if (locationX <= stepAreaBeginX) {
+      if (locationX <= seekTimeAreaBeginX) {
         const brightness = ges.moveY / 15000 * (ges.dy> 0 ? 1 : -1);
         PCPlayerManager.updateBrightness(brightness);
-      } else if (locationX >= this.screenWidth - stepAreaBeginX) {
+      } else if (locationX >= this.currentScreenW - seekTimeAreaBeginX) {
         // 右边区域，音量调节
-        const volume = ges.moveY / 2000 * (ges.dy> 0 ? 1 : -1);
+        const volume = ges.moveY / 10000 * (ges.dy> 0 ? 1 : -1);
         this.player && this.player.setNativeProps({volume});
       }
     }
-  };
-
-  handlePanResponderRelease = () => {
-
   };
 
   /**
@@ -247,8 +182,7 @@ export default class PCPlayerView extends Component {
   handleOrientationChange = evt => {
     const { window, fullscreen } = evt.nativeEvent;
     this.isFullscreen = fullscreen;
-    this.screenWidth = window.width;
-    this.screenHeight = window.height;
+    this.currentScreenW = window.width;
 
     // RN 界面的动画
     Animated.parallel([
@@ -301,7 +235,7 @@ export default class PCPlayerView extends Component {
    * 播放过程中同步 slider
    * @param evt
    */
-  handleChange = evt => {
+  handlePlaying = evt => {
     const { value, currentTime, totalTime, playableDuration } = evt.nativeEvent;
 
     this.slider && this.slider.updateIndicator(value);
@@ -315,10 +249,10 @@ export default class PCPlayerView extends Component {
    * 点击屏幕，显示工具条
    */
   handlePressPlayer = () => {
-    if (this.isShowBottomBar) return;
-    this.isShowBottomBar = true;
+    if (this.isShowToolBar) return;
+    this.isShowToolBar = true;
 
-    Animated.timing(this.animationValue, {
+    Animated.timing(this.toolBarAnimationValue, {
       toValue: 1
     }).start(this.delayDismiss);
   };
@@ -329,10 +263,10 @@ export default class PCPlayerView extends Component {
   delayDismiss = () => {
     this.clearDismissTimer();
     this.delayTimer = setTimeout(() => {
-      Animated.timing(this.animationValue, {
+      Animated.timing(this.toolBarAnimationValue, {
         toValue: 0
       }).start(() => {
-        this.isShowBottomBar = false;
+        this.isShowToolBar = false;
       });
     }, 3000);
   };
@@ -399,7 +333,7 @@ export default class PCPlayerView extends Component {
     const { playState } = this.state;
     const pauseText = playState === PlayState.Playing ? '暂停' : '播放';
 
-    const translateY = this.animationValue.interpolate({
+    const translateY = this.toolBarAnimationValue.interpolate({
       inputRange: [0, 1],
       outputRange: [40, 0]
     });
@@ -430,7 +364,7 @@ export default class PCPlayerView extends Component {
   };
 
   renderTopBar = () => {
-    const translateY = this.animationValue.interpolate({
+    const translateY = this.toolBarAnimationValue.interpolate({
       inputRange: [0, 1],
       outputRange: [-40, 0]
     });
@@ -446,7 +380,7 @@ export default class PCPlayerView extends Component {
 
   renderTimeBottomBar = () => {
     const { currentTime, totalTime} = this.state;
-    const translateY = this.animationValue.interpolate({
+    const translateY = this.toolBarAnimationValue.interpolate({
       inputRange: [0, 1],
       outputRange: [40, 0]
     });
@@ -468,15 +402,37 @@ export default class PCPlayerView extends Component {
     const seconds = parseInt(time % 60);
     return `${minutes < 10 ? 0 : ''}${minutes}:${seconds < 10 ? 0 : ''}${seconds}`
   };
+  
+  get loadingComponent() {
+    const { LoadingComponent } = this.props;
+    if (React.isValidElement(LoadingComponent)) {
+      return LoadingComponent;
+    }
+    if (Object.prototype.toString.call(LoadingComponent) === '[object Function]') {
+      return LoadingComponent();
+    }
+    return null;
+  }
+
+  get errorComponent() {
+    const { NetErrorComponent } = this.props;
+    if (React.isValidElement(NetErrorComponent)) {
+      return NetErrorComponent;
+    }
+    if (Object.prototype.toString.call(NetErrorComponent) === '[object Function]') {
+      return NetErrorComponent();
+    }
+    return null;
+  }
 
   render() {
-    const { style: {height, width}, LoadingComponent, NetErrorComponent, ...rest } = this.props;
+    const { height, width, coverUrl, ...rest } = this.props;
     const { playState } = this.state;
 
     const isNetError = playState === PlayState.NetError;
     const isLoading = playState === PlayState.Buffering;
-    const LoadingView = LoadingComponent || <NetLoading coverUrl={this.props.coverUrl} />;
-    const NetErrorView = NetErrorComponent || <NetError />;
+    const LoadingView = this.loadingComponent || <NetLoading coverUrl={coverUrl} />;
+    const NetErrorView = this.errorComponent || <NetError />;
 
     return (
       <Animated.View
@@ -489,7 +445,7 @@ export default class PCPlayerView extends Component {
           width={width}
           onLoadStateDidChange={this.handelLoadStateDidChange}
           onOrientationChange={this.handleOrientationChange}
-          onChange={this.handleChange}
+          onPlaying={this.handlePlaying}
           onPlayComplete={this.handlePlayComplete}
         />
         <View style={styles.panHandlersView} {...this.panResponder.panHandlers}/>

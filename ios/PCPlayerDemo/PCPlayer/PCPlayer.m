@@ -112,7 +112,7 @@
   }
 }
 
-- (void)setSeek:(float)seek {
+- (void)setSeek:(CGFloat)seek {
   // 按15s快进/快退
   if (ABS(seek) == 15) {
     self.playerVC.currentPlaybackTime += seek;
@@ -133,28 +133,9 @@
   }];
 }
 
-- (void)setVolume:(float)volume {
-  if (_volumeView) {
-    [_volumeView removeFromSuperview];
-    _volumeView = nil;
-  }
-  
-  if (!_volumeView) {
-    _volumeView = [[MPVolumeView alloc] init];
-    _volumeView.hidden = NO;
-    _volumeView.frame = CGRectMake(-40, -40, 40, 40);
-    [self addSubview:_volumeView];
-  }
-  
-  UISlider *sliderView;
-  for (UIView *view in [_volumeView subviews]) {
-    if ([view.class.description isEqualToString:@"MPVolumeSlider"]) {
-      sliderView = (UISlider *)view;
-      break;
-    }
-  }
-  CGFloat oldVolume = sliderView.value;
-  sliderView.value = oldVolume - volume;
+- (void)setVolume:(CGFloat)volume {
+  CGFloat oldVolume = [self systemVolume];
+  [self setSystemVolume:oldVolume - volume];
 }
 
 - (void)play {
@@ -231,14 +212,14 @@
     __weak typeof(self) weakSelf = self;
     _timer = [NSTimer scheduledTimerWithTimeInterval:1 repeats:YES block:^(NSTimer * _Nonnull timer) {
       CGFloat value = weakSelf.playerVC.currentPlaybackTime / weakSelf.playerVC.duration;
-      if (weakSelf.onChange) {
+      if (weakSelf.onPlaying) {
         NSDictionary *body = @{
                                @"value": @(value),
                                @"currentTime": @(weakSelf.playerVC.currentPlaybackTime),
                                @"totalTime": @(weakSelf.playerVC.duration),
                                @"playableDuration": @(weakSelf.playerVC.playableDuration)
                                };
-        weakSelf.onChange(body);
+        weakSelf.onPlaying(body);
       }
       NSLog(@"Timer is keep running...");
     }];
@@ -251,6 +232,30 @@
 - (void)clearTimer {
   [_timer invalidate];
   _timer = nil;
+}
+
+#pragma mark - System Volume Slider
+- (UISlider *)getSystemVolumeSlider {
+  static UISlider *volumeSlider = nil;
+  if (!volumeSlider) {
+    MPVolumeView *volumeView = [[MPVolumeView alloc] initWithFrame:CGRectMake(0, 0, 40, 40)];
+    volumeView.showsVolumeSlider = NO;
+    for (UIView *view in volumeView.subviews) {
+      if ([view.class.description isEqualToString:@"MPVolumeSlider"]){
+        volumeSlider = (UISlider*)view;
+        break;
+      }
+    }
+  }
+  return volumeSlider;
+}
+
+- (CGFloat)systemVolume {
+  return [self getSystemVolumeSlider].value;
+}
+
+- (void)setSystemVolume:(CGFloat)volume {
+  [self getSystemVolumeSlider].value = volume;
 }
 
 @end
