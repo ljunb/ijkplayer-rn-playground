@@ -16,7 +16,7 @@ RCT_EXPORT_MODULE()
 
 - (UIView *)view
 {
-  return [PCPlayer new];
+  return [PCPlayer player];
 }
 
 RCT_EXPORT_VIEW_PROPERTY(url, NSString)
@@ -31,10 +31,19 @@ RCT_EXPORT_VIEW_PROPERTY(onOrientationChange, RCTDirectEventBlock)
 RCT_EXPORT_VIEW_PROPERTY(onPlaying, RCTBubblingEventBlock)
 RCT_EXPORT_VIEW_PROPERTY(onPlayComplete, RCTDirectEventBlock)
 RCT_EXPORT_VIEW_PROPERTY(onLoadStateDidChange, RCTDirectEventBlock)
+RCT_EXPORT_VIEW_PROPERTY(onBrightnessChange, RCTBubblingEventBlock)
+RCT_EXPORT_VIEW_PROPERTY(onVolumeChange, RCTBubblingEventBlock)
 
 RCT_EXPORT_METHOD(updateBrightness:(CGFloat)brightness) {
   CGFloat oldBrightness = [UIScreen mainScreen].brightness;
-  [[UIScreen mainScreen] setBrightness:oldBrightness - brightness];
+  CGFloat currentBrightness = oldBrightness - brightness;
+  currentBrightness = MAX(currentBrightness, 0);
+  currentBrightness = MIN(currentBrightness, 1);
+  [[UIScreen mainScreen] setBrightness:currentBrightness];
+  
+  if ([PCPlayer player].onBrightnessChange) {
+    [PCPlayer player].onBrightnessChange(@{@"brightness": @(currentBrightness)});
+  }
 }
 
 @end

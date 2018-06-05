@@ -11,9 +11,13 @@
 
 @interface PCPlayer : UIView
 
++ (instancetype)player;
+
 @property (nonatomic, copy) RCTDirectEventBlock onLoadStateDidChange;
 @property (nonatomic, copy) RCTDirectEventBlock onOrientationChange;
 @property (nonatomic, copy) RCTBubblingEventBlock onPlaying;
 @property (nonatomic, copy) RCTDirectEventBlock onPlayComplete;
+@property (nonatomic, copy) RCTBubblingEventBlock onVolumeChange;
+@property (nonatomic, copy) RCTBubblingEventBlock onBrightnessChange;
 
 @end

@@ -24,13 +24,21 @@
   BOOL _pause;
   BOOL _fullscreen;
   NSTimer *_timer;
-  MPVolumeView *_volumeView;
 }
 
 - (void)dealloc {
   [_playerVC shutdown];
   _playerVC = nil;
   [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
++ (instancetype)player {
+  static PCPlayer *_player = nil;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    _player = [[PCPlayer alloc] init];
+  });
+  return _player;
 }
 
 - (instancetype)init {
@@ -59,6 +67,7 @@
   if ([_url isEqualToString:url]) return;
   
   [_playerVC shutdown];
+  [_playerVC.view removeFromSuperview];
   _playerVC = nil;
   
   _url = url;
@@ -135,7 +144,13 @@
 
 - (void)setVolume:(CGFloat)volume {
   CGFloat oldVolume = [self systemVolume];
-  [self setSystemVolume:oldVolume - volume];
+  CGFloat currentVolume = oldVolume - volume;
+  currentVolume = MAX(currentVolume, 0);
+  currentVolume = MIN(currentVolume, 1);
+  [self setSystemVolume:currentVolume];
+  if (self.onVolumeChange) {
+    self.onVolumeChange(@{@"volume": @(currentVolume)});
+  }
 }
 
 - (void)play {
@@ -238,7 +253,7 @@
 - (UISlider *)getSystemVolumeSlider {
   static UISlider *volumeSlider = nil;
   if (!volumeSlider) {
-    MPVolumeView *volumeView = [[MPVolumeView alloc] initWithFrame:CGRectMake(0, 0, 40, 40)];
+    MPVolumeView *volumeView = [[MPVolumeView alloc] initWithFrame:CGRectMake(-100, 0, 10, 10)];
     volumeView.showsVolumeSlider = NO;
     for (UIView *view in volumeView.subviews) {
       if ([view.class.description isEqualToString:@"MPVolumeSlider"]){

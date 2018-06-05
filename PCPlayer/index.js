@@ -22,6 +22,8 @@ import {
 import PropTypes from 'prop-types';
 import PlayerSlider from './PlayerSlider';
 import styles from './Player.style';
+import DefaultBrightnessLine from "./DefaultBrightnessLine";
+import DefaultVolumeLine from "./DefaultVolumeLine";
 
 const PCPlayerManager = NativeModules.PCPlayerManager;
 const MPCPlayer = requireNativeComponent('PCPlayer', PCPlayerView);
@@ -43,6 +45,7 @@ export default class PCPlayerView extends Component {
     height: PropTypes.number, // 视频高度
     width: PropTypes.number, // 视频宽度
     seekStep: PropTypes.number, // 快进/快退间隔，单位秒
+    BrightnessComponent: PropTypes.any,
     LoadingComponent: PropTypes.any, //
     NetErrorComponent: PropTypes.any,
     BottomBarComponent: PropTypes.any,
@@ -67,6 +70,8 @@ export default class PCPlayerView extends Component {
     this.screenWValue = new Animated.Value(props.width); // 屏幕翻转时宽度动画值
     this.screenHValue = new Animated.Value(props.height); // 屏幕翻转时高度动画值
     this.toolBarAnimationValue = new Animated.Value(0); // 工具条动画值
+    this.brightnessValue = new Animated.Value(0); // 进行手势操作亮度时，控制亮度动画view的透明度
+    this.volumeValue = new Animated.Value(0); // 进行手势操作音量时，控制亮度动画view的透明度
     this.currentScreenW = props.width; // 记录屏幕宽度，用于判断手势区域
     this.isShowToolBar = false; // 是否显示工具条
     this.isFullscreen = false; // 是否全屏模式
@@ -93,6 +98,7 @@ export default class PCPlayerView extends Component {
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: this.handleResponderGrant,
       onPanResponderMove: this.handlePanResponderMove,
+      onPanResponderRelease: this.handlePanResponderRelease,
     });
   };
 
@@ -120,7 +126,7 @@ export default class PCPlayerView extends Component {
     if (ges.dx !== 0) {
       // 中间的水平滑动手势，处理快进/快退
       if (locationX >= seekTimeAreaBeginX && locationX <= this.currentScreenW - seekTimeAreaBeginX) {
-        const step = ges.moveX / 100 * (ges.dx > 0 ? 1 : -1);
+        const step = ges.moveX / 300 * (ges.dx > 0 ? 1 : -1);
         this.currentValue += step / this.state.totalTime;
         this.currentValue = Math.max(this.currentValue, 0); // 不小于0
         this.currentValue = Math.min(this.currentValue, this.bufferValue); // 不超过缓冲进度
@@ -133,14 +139,24 @@ export default class PCPlayerView extends Component {
     if (ges.dy !== 0) {
       // 左边区域，亮度调节
       if (locationX <= seekTimeAreaBeginX) {
-        const brightness = ges.moveY / 15000 * (ges.dy> 0 ? 1 : -1);
+        const brightness = ges.moveY / 20000 * (ges.dy > 0 ? 1 : -1);
         PCPlayerManager.updateBrightness(brightness);
+        this.brightnessValue.setValue(1);
       } else if (locationX >= this.currentScreenW - seekTimeAreaBeginX) {
         // 右边区域，音量调节
-        const volume = ges.moveY / 10000 * (ges.dy> 0 ? 1 : -1);
+        const volume = ges.moveY / 10000 * (ges.dy > 0 ? 1 : -1);
         this.player && this.player.setNativeProps({volume});
+        this.volumeValue.setValue(1);
       }
     }
+  };
+
+  /**
+   * 手势结束，重置动画值
+   */
+  handlePanResponderRelease = () => {
+    this.brightnessValue.setValue(0);
+    this.volumeValue.setValue(0);
   };
 
   /**
@@ -447,12 +463,26 @@ export default class PCPlayerView extends Component {
           onOrientationChange={this.handleOrientationChange}
           onPlaying={this.handlePlaying}
           onPlayComplete={this.handlePlayComplete}
+          onVolumeChange={evt => this.volumeLine && this.volumeLine.updateVolume(evt.nativeEvent.volume)}
+          onBrightnessChange={evt => this.brightnessLine && this.brightnessLine.updateBrightness(evt.nativeEvent.brightness)}
         />
         <View style={styles.panHandlersView} {...this.panResponder.panHandlers}/>
         {this.renderTopBar()}
         {this.renderBottomBar()}
         {isNetError && NetErrorView}
         {isLoading && LoadingView}
+        <Animated.View
+          style={[StyleSheet.absoluteFill, { opacity: this.brightnessValue, justifyContent: 'center', alignItems: 'center' }]}
+          pointerEvents="none"
+        >
+          <DefaultBrightnessLine ref={r => this.brightnessLine = r}/>
+        </Animated.View>
+        <Animated.View
+          style={[StyleSheet.absoluteFill, { opacity: this.volumeValue, justifyContent: 'center', alignItems: 'center' }]}
+          pointerEvents="none"
+        >
+          <DefaultVolumeLine ref={r => this.volumeLine = r}/>
+        </Animated.View>
       </Animated.View>
     )
   }
@@ -476,4 +506,3 @@ const NetError = () => {
     </View>
   )
 };
-
