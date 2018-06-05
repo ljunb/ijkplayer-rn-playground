@@ -144,7 +144,7 @@ export default class PCPlayerView extends Component {
         this.brightnessValue.setValue(1);
       } else if (locationX >= this.currentScreenW - seekTimeAreaBeginX) {
         // 右边区域，音量调节
-        const volume = ges.moveY / 10000 * (ges.dy > 0 ? 1 : -1);
+        const volume = ges.moveY / 15000 * (ges.dy > 0 ? 1 : -1);
         this.player && this.player.setNativeProps({volume});
         this.volumeValue.setValue(1);
       }

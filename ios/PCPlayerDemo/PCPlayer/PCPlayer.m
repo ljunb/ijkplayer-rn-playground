@@ -253,8 +253,8 @@
 - (UISlider *)getSystemVolumeSlider {
   static UISlider *volumeSlider = nil;
   if (!volumeSlider) {
-    MPVolumeView *volumeView = [[MPVolumeView alloc] initWithFrame:CGRectMake(-100, 0, 10, 10)];
-    volumeView.showsVolumeSlider = NO;
+    MPVolumeView *volumeView = [[MPVolumeView alloc] initWithFrame:CGRectMake(-1000, 0, 10, 10)];
+    [self addSubview:volumeView];
     for (UIView *view in volumeView.subviews) {
       if ([view.class.description isEqualToString:@"MPVolumeSlider"]){
         volumeSlider = (UISlider*)view;
