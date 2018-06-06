@@ -1,34 +1,32 @@
 package com.pcplayerdemo.PCPlayer;
 
 import android.content.Context;
+import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
-import android.view.View;
 import android.view.ViewGroup;
-import android.widget.LinearLayout;
+import android.widget.FrameLayout;
 
 import com.facebook.react.bridge.ReactContext;
 
 import tv.danmaku.ijk.media.player.IMediaPlayer;
 import tv.danmaku.ijk.media.player.IjkMediaPlayer;
 
-public class PCPlayer extends View {
+public class PCPlayer extends FrameLayout {
     private IjkMediaPlayer mediaPlayer = null;
     private SurfaceView surfaceView;
-    private String mUrl = "http://covertness.qiniudn.com/android_zaixianyingyinbofangqi_test_baseline.mp4";
+    private String mUrl = "";
     private Context context;
 
     public PCPlayer(ReactContext reactContext) {
         super(reactContext);
         this.context = reactContext;
-        createSurfaceView();
     }
 
     private void createSurfaceView() {
         surfaceView = new SurfaceView(context);
-        ViewGroup.LayoutParams framelayout_params =
-                new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT);
+        LayoutParams layoutParams = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT, Gravity.CENTER);
         surfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
             @Override
             public void surfaceCreated(SurfaceHolder holder) {
@@ -46,7 +44,8 @@ public class PCPlayer extends View {
             }
         });
 
-        surfaceView.setLayoutParams(framelayout_params);
+        surfaceView.setLayoutParams(layoutParams);
+        this.addView(surfaceView);
     }
 
     private void setupPlayer() {
@@ -56,6 +55,7 @@ public class PCPlayer extends View {
             mediaPlayer.release();
         }
         mediaPlayer = new IjkMediaPlayer();
+        IjkMediaPlayer.native_setLogLevel(IjkMediaPlayer.IJK_LOG_DEBUG);
         mediaPlayer.setOnPreparedListener(new IMediaPlayer.OnPreparedListener() {
             @Override
             public void onPrepared(IMediaPlayer iMediaPlayer) {
@@ -83,9 +83,41 @@ public class PCPlayer extends View {
         }
         mediaPlayer.setDisplay(surfaceView.getHolder());
         mediaPlayer.prepareAsync();
+        mediaPlayer.start();
     }
 
+    // ------------------------ 面向 PCPlayerManager 的方法 ------------------------
     public void setUrl(String url) {
-        mUrl = url;
+        if (TextUtils.equals("", mUrl)) {
+            mUrl = url;
+            createSurfaceView();
+        } else {
+            mUrl = url;
+            setupPlayer();
+        }
+    }
+
+    public void setPause(boolean pause) {
+        if (mediaPlayer != null) {
+            if (mediaPlayer.isPlaying()) {
+                mediaPlayer.pause();
+            } else {
+                mediaPlayer.start();
+            }
+        }
+    }
+
+    public void setSeek(float seek) {
+        if (mediaPlayer == null) return;
+        // todo seek
+    }
+
+    public void setFullscreen(boolean fullscreen) {
+        // todo orientation change
+        if (fullscreen) {
+
+        } else {
+
+        }
     }
 }

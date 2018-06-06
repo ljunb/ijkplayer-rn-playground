@@ -5,7 +5,7 @@ import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.annotations.ReactProp;
 
 public class PCPlayerManager extends SimpleViewManager<PCPlayer>{
-    public static final String REACT_CLASS = "PCPlayer";
+    private static final String REACT_CLASS = "PCPlayer";
 
     @Override
     public String getName() {
@@ -19,7 +19,7 @@ public class PCPlayerManager extends SimpleViewManager<PCPlayer>{
 
     @ReactProp(name = "url")
     public void setUrl(PCPlayer player, String url) {
-
+        player.setUrl(url);
     }
 
     @ReactProp(name = "height")
@@ -30,5 +30,20 @@ public class PCPlayerManager extends SimpleViewManager<PCPlayer>{
     @ReactProp(name = "width")
     public void setWidth(PCPlayer player, float width) {
 
+    }
+
+    @ReactProp(name = "pause")
+    public void setPause(PCPlayer player, boolean pause) {
+        player.setPause(pause);
+    }
+
+    @ReactProp(name = "seek")
+    public void setSeek(PCPlayer player, float seek) {
+        player.setSeek(seek);
+    }
+
+    @ReactProp(name = "fullscreen")
+    public void setFullscreen(PCPlayer player, boolean fullscreen) {
+        player.setFullscreen(fullscreen);
     }
 }
