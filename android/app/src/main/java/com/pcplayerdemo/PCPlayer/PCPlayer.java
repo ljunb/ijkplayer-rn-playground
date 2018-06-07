@@ -1,14 +1,19 @@
 package com.pcplayerdemo.PCPlayer;
 
 import android.content.Context;
+import android.os.Handler;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
+import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.ReactContext;
+import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.uimanager.events.RCTEventEmitter;
 
 import tv.danmaku.ijk.media.player.IMediaPlayer;
 import tv.danmaku.ijk.media.player.IjkMediaPlayer;
@@ -18,10 +23,15 @@ public class PCPlayer extends FrameLayout {
     private SurfaceView surfaceView;
     private String mUrl = "";
     private Context context;
+    private Runnable runnable = null;
+
+    private Handler mPlayingHander = new Handler();
+    private ReactContext mReactContext;
 
     public PCPlayer(ReactContext reactContext) {
         super(reactContext);
         this.context = reactContext;
+        mReactContext = (ReactContext)getContext();
     }
 
     private void createSurfaceView() {
@@ -59,7 +69,21 @@ public class PCPlayer extends FrameLayout {
         mediaPlayer.setOnPreparedListener(new IMediaPlayer.OnPreparedListener() {
             @Override
             public void onPrepared(IMediaPlayer iMediaPlayer) {
+                mediaPlayer.start();
+                runnable = new Runnable() {
+                    @Override
+                    public void run() {
+                        // value, currentTime, totalTime, playableDuration
+                        WritableMap body = Arguments.createMap();
+                        body.putDouble("value", mediaPlayer.getCurrentPosition() / mediaPlayer.getDuration());
+                        body.putDouble("currentTime", mediaPlayer.getCurrentPosition());
+                        body.putDouble("totalTime", mediaPlayer.getDuration());
+                        body.putDouble("playableDuration", mediaPlayer.getDuration());
+                        mReactContext.getJSModule(RCTEventEmitter.class).receiveEvent(getId(), "onPlaying", body);
 
+                        mPlayingHander.postDelayed(runnable, Math.round(1000));
+                    }
+                };
             }
         });
         mediaPlayer.setOnSeekCompleteListener(new IMediaPlayer.OnSeekCompleteListener() {
@@ -71,6 +95,12 @@ public class PCPlayer extends FrameLayout {
         mediaPlayer.setOnCompletionListener(new IMediaPlayer.OnCompletionListener() {
             @Override
             public void onCompletion(IMediaPlayer iMediaPlayer) {
+                mediaPlayer.seekTo(0);
+            }
+        });
+        mediaPlayer.setOnBufferingUpdateListener(new IMediaPlayer.OnBufferingUpdateListener() {
+            @Override
+            public void onBufferingUpdate(IMediaPlayer iMediaPlayer, int i) {
 
             }
         });
@@ -83,7 +113,6 @@ public class PCPlayer extends FrameLayout {
         }
         mediaPlayer.setDisplay(surfaceView.getHolder());
         mediaPlayer.prepareAsync();
-        mediaPlayer.start();
     }
 
     // ------------------------ 面向 PCPlayerManager 的方法 ------------------------
@@ -110,6 +139,12 @@ public class PCPlayer extends FrameLayout {
     public void setSeek(float seek) {
         if (mediaPlayer == null) return;
         // todo seek
+        if (Math.abs(seek) == 15) {
+
+        } else {
+            mediaPlayer.seekTo((long) (mediaPlayer.getDuration() * seek));
+        }
+        System.out.println("seek" + seek + " final " + (long) (mediaPlayer.getDuration() * seek) + "duration " + mediaPlayer.getDuration());
     }
 
     public void setFullscreen(boolean fullscreen) {
@@ -119,5 +154,9 @@ public class PCPlayer extends FrameLayout {
         } else {
 
         }
+    }
+
+    public void setVolume(float volume) {
+        mediaPlayer.setVolume(volume, volume);
     }
 }

@@ -91,5 +91,15 @@ export default StyleSheet.create({
     bottom: 40,
     right: 40,
     backgroundColor: 'transparent'
+  },
+  noWifiBtn: {
+    height: 26,
+    paddingHorizontal: 5,
+    borderRadius: 4,
+    borderColor: '#fff',
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 5
   }
 });

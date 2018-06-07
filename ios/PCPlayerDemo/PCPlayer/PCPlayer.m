@@ -11,6 +11,7 @@
 
 #define SCREEN_W [UIScreen mainScreen].bounds.size.width
 #define SCREEN_H [UIScreen mainScreen].bounds.size.height
+#define WeakObj(o) __weak typeof(o) o##Weak = o;
 
 @interface PCPlayer ()
 @property (nonatomic, strong) IJKFFMoviePlayerController *playerVC;
@@ -224,17 +225,17 @@
 #pragma mark - Timer
 - (void)setupTimer {
   if (!_timer) {
-    __weak typeof(self) weakSelf = self;
+    WeakObj(self)
     _timer = [NSTimer scheduledTimerWithTimeInterval:1 repeats:YES block:^(NSTimer * _Nonnull timer) {
-      CGFloat value = weakSelf.playerVC.currentPlaybackTime / weakSelf.playerVC.duration;
-      if (weakSelf.onPlaying) {
+      CGFloat value = selfWeak.playerVC.currentPlaybackTime / selfWeak.playerVC.duration;
+      if (selfWeak.onPlaying) {
         NSDictionary *body = @{
                                @"value": @(value),
-                               @"currentTime": @(weakSelf.playerVC.currentPlaybackTime),
-                               @"totalTime": @(weakSelf.playerVC.duration),
-                               @"playableDuration": @(weakSelf.playerVC.playableDuration)
+                               @"currentTime": @(selfWeak.playerVC.currentPlaybackTime),
+                               @"totalTime": @(selfWeak.playerVC.duration),
+                               @"playableDuration": @(selfWeak.playerVC.playableDuration)
                                };
-        weakSelf.onPlaying(body);
+        selfWeak.onPlaying(body);
       }
       NSLog(@"Timer is keep running...");
     }];

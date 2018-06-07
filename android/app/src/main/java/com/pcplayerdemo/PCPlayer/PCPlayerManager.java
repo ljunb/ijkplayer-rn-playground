@@ -1,11 +1,25 @@
 package com.pcplayerdemo.PCPlayer;
 
+import com.facebook.react.bridge.ReactContextBaseJavaModule;
+import com.facebook.react.common.MapBuilder;
 import com.facebook.react.uimanager.SimpleViewManager;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.annotations.ReactProp;
 
-public class PCPlayerManager extends SimpleViewManager<PCPlayer>{
+import java.util.Map;
+
+import javax.annotation.Nullable;
+
+public class PCPlayerManager extends SimpleViewManager<PCPlayer> {
     private static final String REACT_CLASS = "PCPlayer";
+
+    @Nullable
+    @Override
+    public Map<String, Object> getExportedCustomBubblingEventTypeConstants() {
+        MapBuilder.Builder builder = MapBuilder.builder();
+        builder.put("onPlaying", "onPlaying");
+        return builder.build();
+    }
 
     @Override
     public String getName() {
@@ -45,5 +59,10 @@ public class PCPlayerManager extends SimpleViewManager<PCPlayer>{
     @ReactProp(name = "fullscreen")
     public void setFullscreen(PCPlayer player, boolean fullscreen) {
         player.setFullscreen(fullscreen);
+    }
+
+    @ReactProp(name = "volume")
+    public void setVolume(PCPlayer player, float volume) {
+        player.setVolume(volume);
     }
 }

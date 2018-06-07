@@ -35,8 +35,15 @@ const PlayState = {
   'Playing': 2, // 播放中
   'Pause': 3, // 暂停
   'Stop': 4, // 播放完毕
-  'NetError': 5 // 网络出错
+  'NetError': 5, // 网络出错
+  'NoWiFi': 6 // 非WiFi
 };
+// 手势操作的事件类型
+const OperateEvent = {
+  'Brightness': 0,
+  'SeekTime': 1,
+  'Volume': 2
+}
 
 export default class PCPlayerView extends Component {
   static propTypes = {
@@ -78,6 +85,7 @@ export default class PCPlayerView extends Component {
     this.netInfoType = null; // 网络连接模式
     this.currentValue = 0; // 当前播放进度值
     this.bufferValue = 0; // 当前缓冲进度值
+    this.currentOperateEvent = null; // 当前手势操作的事
     this.createPanResponder();
   }
 
@@ -124,6 +132,10 @@ export default class PCPlayerView extends Component {
 
     if (ges.dx === 0 && ges.dy === 0) return;
     if (ges.dx !== 0) {
+      if (!this.allowOperationEvent(OperateEvent.SeekTime)) return;
+      // 记录事件类型
+      this.currentOperateEvent = OperateEvent.SeekTime;
+    
       // 中间的水平滑动手势，处理快进/快退
       if (locationX >= seekTimeAreaBeginX && locationX <= this.currentScreenW - seekTimeAreaBeginX) {
         const step = ges.moveX / 300 * (ges.dx > 0 ? 1 : -1);
@@ -139,10 +151,16 @@ export default class PCPlayerView extends Component {
     if (ges.dy !== 0) {
       // 左边区域，亮度调节
       if (locationX <= seekTimeAreaBeginX) {
+        if (!this.allowOperationEvent(OperateEvent.Brightness)) return;
+        this.currentOperateEvent = OperateEvent.Brightness;
+
         const brightness = ges.moveY / 20000 * (ges.dy > 0 ? 1 : -1);
         PCPlayerManager.updateBrightness(brightness);
         this.brightnessValue.setValue(1);
       } else if (locationX >= this.currentScreenW - seekTimeAreaBeginX) {
+        if (!this.allowOperationEvent(OperateEvent.Volume)) return;
+        this.currentOperateEvent = OperateEvent.Volume;
+
         // 右边区域，音量调节
         const volume = ges.moveY / 15000 * (ges.dy > 0 ? 1 : -1);
         this.player && this.player.setNativeProps({volume});
@@ -157,7 +175,13 @@ export default class PCPlayerView extends Component {
   handlePanResponderRelease = () => {
     this.brightnessValue.setValue(0);
     this.volumeValue.setValue(0);
+    this.currentOperateEvent = null;
   };
+
+  /**
+   * 是否允许开始某个手势事件
+   */
+  allowOperationEvent = event => !this.currentOperateEvent || this.currentOperateEvent === event;
 
   /**
    * 监听网络状态变化
@@ -181,9 +205,7 @@ export default class PCPlayerView extends Component {
    */
   setupPlayer = () => {
     if (this.netInfoType === 'cellular') {
-      console.log(`当前非WiFi，是否继续使用流量播放？`);
-      // todo: 添加提示
-      // this.setState({playState: PlayState.Playing});
+      this.setState({playState: PlayState.NoWiFi});
     } else if (this.netInfoType === 'wifi') {
       this.player && this.player.setNativeProps({pause: false});
       this.setState({playState: PlayState.Playing});
@@ -345,6 +367,15 @@ export default class PCPlayerView extends Component {
     console.log(`Load state: ${loadState}`);
   };
 
+  /**
+   * 无WiFi情况下，继续播放
+   */
+  handleKeepOnPlaying = () => {
+    this.setState({ playState: PlayState.Buffering });
+    this.player && this.player.setNativeProps({ pause: false });
+  }
+
+  // --------------- Render method ---------------
   renderBottomBar = () => {
     const { playState } = this.state;
     const pauseText = playState === PlayState.Playing ? '暂停' : '播放';
@@ -418,28 +449,6 @@ export default class PCPlayerView extends Component {
     const seconds = parseInt(time % 60);
     return `${minutes < 10 ? 0 : ''}${minutes}:${seconds < 10 ? 0 : ''}${seconds}`
   };
-  
-  get loadingComponent() {
-    const { LoadingComponent } = this.props;
-    if (React.isValidElement(LoadingComponent)) {
-      return LoadingComponent;
-    }
-    if (Object.prototype.toString.call(LoadingComponent) === '[object Function]') {
-      return LoadingComponent();
-    }
-    return null;
-  }
-
-  get errorComponent() {
-    const { NetErrorComponent } = this.props;
-    if (React.isValidElement(NetErrorComponent)) {
-      return NetErrorComponent;
-    }
-    if (Object.prototype.toString.call(NetErrorComponent) === '[object Function]') {
-      return NetErrorComponent();
-    }
-    return null;
-  }
 
   render() {
     const { height, width, coverUrl, ...rest } = this.props;
@@ -449,6 +458,7 @@ export default class PCPlayerView extends Component {
     const isLoading = playState === PlayState.Buffering;
     const LoadingView = this.loadingComponent || <NetLoading coverUrl={coverUrl} />;
     const NetErrorView = this.errorComponent || <NetError />;
+    const isNoWiFi = playState === PlayState.NoWiFi;
 
     return (
       <Animated.View
@@ -483,8 +493,32 @@ export default class PCPlayerView extends Component {
         >
           <DefaultVolumeLine ref={r => this.volumeLine = r}/>
         </Animated.View>
+        {isNoWiFi && <NoWiFi onPress={this.handleKeepOnPlaying}/>}
       </Animated.View>
-    )
+    );
+  }
+
+  // --------------- Get method ---------------
+  get loadingComponent() {
+    const { LoadingComponent } = this.props;
+    if (React.isValidElement(LoadingComponent)) {
+      return LoadingComponent;
+    }
+    if (Object.prototype.toString.call(LoadingComponent) === '[object Function]') {
+      return LoadingComponent();
+    }
+    return null;
+  }
+
+  get errorComponent() {
+    const { NetErrorComponent } = this.props;
+    if (React.isValidElement(NetErrorComponent)) {
+      return NetErrorComponent;
+    }
+    if (Object.prototype.toString.call(NetErrorComponent) === '[object Function]') {
+      return NetErrorComponent();
+    }
+    return null;
   }
 }
 
@@ -503,6 +537,21 @@ const NetError = () => {
   return (
     <View style={[StyleSheet.absoluteFill, {justifyContent: 'center', alignItems: 'center'}]}>
       <Text>网络出错！</Text>
+    </View>
+  )
+};
+
+const NoWiFi = ({onPress}) => {
+  return (
+    <View style={[StyleSheet.absoluteFill, {justifyContent: 'center', alignItems: 'center'}]}>
+      <Text style={{color: '#fff', fontSize: 12}}>当前非WiFi，是否继续使用流量播放？</Text>
+      <TouchableOpacity
+        activeOpacity={0.75}
+        onPress={onPress}
+        style={styles.noWifiBtn}
+      >
+        <Text style={{color: '#fff', fontSize: 12}}>继续播放</Text>
+      </TouchableOpacity>
     </View>
   )
 };
